@@ -1,13 +1,20 @@
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
-        token = request.COOKIES.get("access_token")
+        raw_token = request.COOKIES.get("access_token")
 
-        if token:
-            validated = self.get_validated_token(token)
-            return self.get_user(validated), validated
+        if raw_token:
+            try:
+                validated_token = self.get_validated_token(raw_token)
+            except Exception as exc:
+                raise AuthenticationFailed(
+                    "Your session is invalid or expired. Please sign in again."
+                ) from exc
 
-        # Allows standard Bearer-token authentication too, if needed.
+            user = self.get_user(validated_token)
+            return user, validated_token
+
         return super().authenticate(request)

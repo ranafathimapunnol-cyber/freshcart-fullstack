@@ -7,11 +7,12 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated,IsAdminUser
 from rest_framework.response import Response
 
 from .models import Product, Bill, BillItem
 from .serializers import ProductSerializer, BillSerializer
+
 
 
 GST_RATE = Decimal("0.05")
@@ -177,3 +178,42 @@ def bill_detail(request, bill_id):
     )
 
     return Response(BillSerializer(bill).data)
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def admin_create_product(request):
+    serializer = ProductSerializer(data=request.data)
+
+    if serializer.is_valid():
+        product = serializer.save()
+        return Response(
+            ProductSerializer(product).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAdminUser])
+def admin_manage_product(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+
+    if request.method == "DELETE":
+        # Preserve historical bill items and product references.
+        product.active = False
+        product.save(update_fields=["active"])
+        return Response({"message": "Product deactivated successfully."})
+
+    serializer = ProductSerializer(
+        product,
+        data=request.data,
+        partial=True,
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

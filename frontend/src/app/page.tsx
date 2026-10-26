@@ -314,7 +314,7 @@ export default function Home() {
               {/* Decorative hero image; product photos are loaded from your API below. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1400&auto=format&fit=crop&q=90"
+                src="https://i.pinimg.com/1200x/c0/11/e5/c011e531c51467be1c357dbf691d59ca.jpg"
                 alt="Fresh colourful produce at a grocery market"
                 className="h-full w-full object-cover object-center"
                 fetchPriority="high"

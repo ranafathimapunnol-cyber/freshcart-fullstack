@@ -1,23 +1,24 @@
-
 "use client";
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { GoogleLogin } from "@react-oauth/google";
 
-const API =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"
+).replace(/\/$/, "");
 
 export default function LoginPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
@@ -28,82 +29,119 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
           data.error ||
             data.detail ||
-            "Invalid email or password."
+            data.message ||
+            "Invalid email or password. Please try again."
         );
       }
 
-      router.push("/pos");
+      router.replace("/pos");
+      router.refresh();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to log in. Check that the backend is running."
+          : "Unable to sign in. Please try again."
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const inputClass =
-    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-500 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+  async function handleGoogleSuccess(credential: string) {
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API}/auth/google/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ credential }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.detail ||
+            data.message ||
+            "Google sign-in failed. Please try again."
+        );
+      }
+
+      router.replace("/pos");
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to sign in with Google."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-10">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-xl md:grid-cols-2">
-        <section className="hidden flex-col justify-between bg-emerald-800 p-10 text-white md:flex">
-          <Link href="/" className="text-2xl font-black">
-            FreshCart.
-          </Link>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+      <div className="w-full max-w-md">
+        {/* Brand */}
+        <Link
+          href="/"
+          className="mb-8 flex items-center justify-center gap-3"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-sm">
+            F
+          </div>
 
-          <div>
-            <div className="text-7xl">🛒</div>
-            <h1 className="mt-6 text-4xl font-black leading-tight">
-              Fresh choices start here.
+          <span className="text-3xl font-bold tracking-tight text-slate-900">
+            Fresh<span className="text-green-600">Cart</span>
+          </span>
+        </Link>
+
+        {/* Login card */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
+          <div className="mb-7 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Welcome back
             </h1>
-            <p className="mt-4 leading-7 text-emerald-100">
-              Sign in to continue to your FreshCart store experience.
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Sign in to your account to continue shopping.
             </p>
           </div>
 
-          <p className="text-sm text-emerald-100">
-            Good food. Better living.
-          </p>
-        </section>
+          {/* Error message */}
+          {error && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          )}
 
-        <section className="p-7 sm:p-12">
-          <Link
-            href="/"
-            className="font-black text-emerald-700 md:hidden"
-          >
-            FreshCart.
-          </Link>
-
-          <p className="mt-5 text-sm font-bold uppercase tracking-widest text-emerald-700">
-            Welcome back
-          </p>
-
-          <h2 className="mt-2 text-3xl font-black text-slate-900">
-            Sign in to FreshCart
-          </h2>
-
-          <p className="mt-2 text-slate-600">
-            Enter your account details below.
-          </p>
-
-          <form onSubmit={submit} className="mt-8 space-y-5">
+          {/* Email and password */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label
                 htmlFor="email"
-                className="mb-2 block text-sm font-semibold text-slate-700"
+                className="mb-2 block text-sm font-medium text-slate-700"
               >
                 Email address
               </label>
@@ -112,71 +150,104 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="email"
-                required
                 autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className={inputClass}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100 disabled:opacity-60"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-semibold text-slate-700"
-              >
-                Password
-              </label>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
+
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-semibold text-green-700 transition hover:text-green-800"
+                >
+                  Forgot password?
+                </Link>
+              </div>
 
               <input
                 id="password"
                 name="password"
                 type="password"
-                required
                 autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className={inputClass}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100 disabled:opacity-60"
               />
             </div>
-
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {error}
-              </p>
-            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-emerald-700 py-3.5 font-bold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-xl bg-green-600 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-600">
-            New to FreshCart?{" "}
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-xs font-medium text-slate-500">
+                OR CONTINUE WITH
+              </span>
+            </div>
+          </div>
+
+          {/* Google sign-in */}
+          <div className="flex min-h-10 justify-center">
+            <GoogleLogin
+              onSuccess={(response) => {
+                if (response.credential) {
+                  void handleGoogleSuccess(response.credential);
+                } else {
+                  setError("Google did not return a credential. Please try again.");
+                }
+              }}
+              onError={() => {
+                setError("Google sign-in was unsuccessful. Please try again.");
+              }}
+              text="signin_with"
+              shape="rectangular"
+              theme="outline"
+              size="large"
+              width="320"
+            />
+          </div>
+
+          <p className="mt-7 text-center text-sm text-slate-600">
+            Don&apos;t have an account?{" "}
             <Link
-              href="/signup"
-              className="font-bold text-emerald-700 hover:underline"
+              href="/register"
+              className="font-semibold text-green-700 transition hover:text-green-800"
             >
               Create an account
             </Link>
           </p>
-
-          <Link
-            href="/"
-            className="mt-5 block text-center text-sm text-slate-500 transition hover:text-emerald-700"
-          >
-            ← Back to home
-          </Link>
         </section>
+
+        <p className="mt-6 text-center text-xs text-slate-400">
+          Fresh choices, every day. 🥬
+        </p>
       </div>
     </main>
   );

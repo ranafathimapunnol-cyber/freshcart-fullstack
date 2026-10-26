@@ -3,13 +3,21 @@ from rest_framework import serializers
 from .models import Product, Bill, BillItem
 
 
+
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            "id", "name", "category", "price",
-            "stock", "emoji", "active",
+            "id",
+            "name",
+            "category",
+            "price",
+            "stock",
+            "emoji",
+            "active",
+            "image_url",
         ]
+
 
 
 class BillItemSerializer(serializers.ModelSerializer):

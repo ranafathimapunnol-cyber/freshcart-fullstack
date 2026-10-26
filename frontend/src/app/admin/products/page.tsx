@@ -1,9 +1,19 @@
-
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Package, Plus, Pencil, Trash2, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Package,
+  Plus,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  ShieldCheck,
+  LayoutDashboard,
+  UserRound,
+  Store,
+} from "lucide-react";
 
 type Product = {
   id: number;
@@ -21,6 +31,16 @@ type ProductForm = {
   price: string;
   stock: string;
   emoji: string;
+};
+
+type LoggedInUser = {
+  id?: number;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  email?: string;
+  is_staff?: boolean;
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -45,6 +65,7 @@ export default function AdminProductsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
+  const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(null);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -61,7 +82,7 @@ export default function AdminProductsPage() {
       }
 
       const data: Product[] = await response.json();
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not load products."
@@ -86,7 +107,7 @@ export default function AdminProductsPage() {
           return;
         }
 
-        const user = await response.json();
+        const user: LoggedInUser = await response.json();
 
         if (!user.is_staff) {
           router.replace("/pos");
@@ -94,11 +115,14 @@ export default function AdminProductsPage() {
         }
 
         if (!cancelled) {
+          setCurrentUser(user);
           setChecking(false);
           await loadProducts();
         }
       } catch {
-        router.replace("/login");
+        if (!cancelled) {
+          router.replace("/login");
+        }
       }
     }
 
@@ -109,6 +133,20 @@ export default function AdminProductsPage() {
     };
   }, [router, loadProducts]);
 
+  const userName =
+    [
+      currentUser?.first_name,
+      currentUser?.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    currentUser?.name ||
+    currentUser?.username ||
+    currentUser?.email?.split("@")[0] ||
+    "Administrator";
+
+  const userInitial = userName.charAt(0).toUpperCase();
+
   function startEdit(product: Product) {
     setEditingId(product.id);
     setForm({
@@ -116,7 +154,7 @@ export default function AdminProductsPage() {
       category: product.category,
       price: product.price,
       stock: String(product.stock),
-      emoji: product.emoji,
+      emoji: product.emoji || "🛒",
     });
     setError("");
     setMessage("");
@@ -194,7 +232,12 @@ export default function AdminProductsPage() {
         throw new Error(detail || "Could not save the product.");
       }
 
-      setMessage(editingId ? "Product updated successfully." : "Product added successfully.");
+      setMessage(
+        editingId
+          ? "Product updated successfully."
+          : "Product added successfully."
+      );
+
       setEditingId(null);
       setForm(EMPTY_FORM);
       await loadProducts();
@@ -232,7 +275,11 @@ export default function AdminProductsPage() {
       }
 
       setMessage(`${product.name} was deactivated.`);
-      if (editingId === product.id) cancelEdit();
+
+      if (editingId === product.id) {
+        cancelEdit();
+      }
+
       await loadProducts();
     } catch (err) {
       setError(
@@ -243,6 +290,7 @@ export default function AdminProductsPage() {
 
   const visibleProducts = products.filter((product) => {
     const term = search.toLowerCase();
+
     return (
       product.name.toLowerCase().includes(term) ||
       product.category.toLowerCase().includes(term)
@@ -252,85 +300,172 @@ export default function AdminProductsPage() {
   if (checking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-700">
-        Checking administrator access...
+        <div className="text-center">
+          <RefreshCw className="mx-auto mb-3 animate-spin" size={26} />
+          <p className="font-medium">Checking administrator access...</p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      {/* Top navigation */}
+      <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-8">
+          <button
+            type="button"
+            onClick={() => router.push("/pos")}
+            className="flex shrink-0 items-center gap-3 rounded-xl text-left"
+            aria-label="Go to FreshCart POS"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-white">
+              <Store size={22} />
+            </span>
+
+            <span>
+              <span className="block text-lg font-black tracking-tight">
+                FreshCart
+              </span>
+              <span className="hidden text-xs text-slate-500 sm:block">
+                Grocery management
+              </span>
+            </span>
+          </button>
+
+          <div className="flex items-center gap-3 sm:gap-5">
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800"
+            >
+              <LayoutDashboard size={18} />
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
+
+            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-800">
+                {userInitial || <UserRound size={20} />}
+              </div>
+
+              <div className="hidden min-w-0 sm:block">
+                <p className="max-w-40 truncate text-sm font-bold text-slate-800">
+                  {userName}
+                </p>
+                <p className="flex items-center gap-1 text-xs text-emerald-700">
+                  <ShieldCheck size={12} />
+                  Administrator
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Page content */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
         <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <button
-              onClick={() => router.push("/pos")}
-              className="mb-3 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-700"
+              type="button"
+              onClick={() => router.push("/dashboard")}
+              className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-emerald-700"
             >
-              <ArrowLeft size={16} /> Back to POS
+              <ArrowLeft size={16} />
+              Back to dashboard
             </button>
+
             <h1 className="text-3xl font-black tracking-tight">
               Product management
             </h1>
+
             <p className="mt-1 text-slate-500">
               Manage your FreshCart products, prices and stock.
             </p>
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
-            <ShieldCheck size={18} /> Administrator
+            <ShieldCheck size={18} />
+            Administrator access
           </div>
         </header>
 
         {error && (
-          <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          >
             {error}
           </div>
         )}
 
         {message && (
-          <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <div
+            role="status"
+            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+          >
             {message}
           </div>
         )}
 
         <div className="grid items-start gap-6 lg:grid-cols-[360px_1fr]">
+          {/* Add/edit form */}
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-5 flex items-center gap-3">
               <div className="rounded-xl bg-emerald-100 p-3 text-emerald-800">
                 {editingId ? <Pencil size={22} /> : <Plus size={22} />}
               </div>
+
               <div>
                 <h2 className="text-lg font-bold">
                   {editingId ? "Edit product" : "Add a product"}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  {editingId ? `Product #${editingId}` : "Enter product details"}
+                  {editingId
+                    ? `Product #${editingId}`
+                    : "Enter product details"}
                 </p>
               </div>
             </div>
 
             <form onSubmit={saveProduct} className="space-y-4">
               <div>
-                <label htmlFor="name" className="mb-1.5 block text-sm font-semibold">Product name</label>
+                <label
+                  htmlFor="name"
+                  className="mb-1.5 block text-sm font-semibold"
+                >
+                  Product name
+                </label>
                 <input
                   id="name"
                   required
                   maxLength={120}
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, name: e.target.value })
+                  }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                   placeholder="e.g. Fresh apples"
                 />
               </div>
 
               <div>
-                <label htmlFor="category" className="mb-1.5 block text-sm font-semibold">Category</label>
+                <label
+                  htmlFor="category"
+                  className="mb-1.5 block text-sm font-semibold"
+                >
+                  Category
+                </label>
                 <input
                   id="category"
                   required
                   maxLength={80}
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                   placeholder="Fruits, Dairy, Bakery..."
                 />
@@ -338,7 +473,12 @@ export default function AdminProductsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="price" className="mb-1.5 block text-sm font-semibold">Price (₹)</label>
+                  <label
+                    htmlFor="price"
+                    className="mb-1.5 block text-sm font-semibold"
+                  >
+                    Price (₹)
+                  </label>
                   <input
                     id="price"
                     type="number"
@@ -347,13 +487,21 @@ export default function AdminProductsPage() {
                     max="99999999"
                     step="0.01"
                     value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, price: e.target.value })
+                    }
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                     placeholder="0.00"
                   />
                 </div>
+
                 <div>
-                  <label htmlFor="stock" className="mb-1.5 block text-sm font-semibold">Stock</label>
+                  <label
+                    htmlFor="stock"
+                    className="mb-1.5 block text-sm font-semibold"
+                  >
+                    Stock
+                  </label>
                   <input
                     id="stock"
                     type="number"
@@ -361,19 +509,28 @@ export default function AdminProductsPage() {
                     min="0"
                     step="1"
                     value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, stock: e.target.value })
+                    }
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="emoji" className="mb-1.5 block text-sm font-semibold">Product emoji</label>
+                <label
+                  htmlFor="emoji"
+                  className="mb-1.5 block text-sm font-semibold"
+                >
+                  Product emoji
+                </label>
                 <input
                   id="emoji"
                   maxLength={10}
                   value={form.emoji}
-                  onChange={(e) => setForm({ ...form, emoji: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, emoji: e.target.value })
+                  }
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                   placeholder="🥦"
                 />
@@ -384,7 +541,11 @@ export default function AdminProductsPage() {
                 disabled={saving}
                 className="w-full rounded-xl bg-emerald-700 px-4 py-3 font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {saving ? "Saving..." : editingId ? "Save changes" : "Add product"}
+                {saving
+                  ? "Saving..."
+                  : editingId
+                    ? "Save changes"
+                    : "Add product"}
               </button>
 
               {editingId !== null && (
@@ -399,21 +560,28 @@ export default function AdminProductsPage() {
             </form>
           </section>
 
+          {/* Product list */}
           <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold">Products</h2>
                 <p className="text-sm text-slate-500">
-                  {products.length} active product{products.length === 1 ? "" : "s"}
+                  {products.length} active product
+                  {products.length === 1 ? "" : "s"}
                 </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => void loadProducts()}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
               >
-                <RefreshCw size={16} /> Refresh
+                <RefreshCw
+                  size={16}
+                  className={loading ? "animate-spin" : ""}
+                />
+                Refresh
               </button>
             </div>
 
@@ -426,12 +594,19 @@ export default function AdminProductsPage() {
             />
 
             {loading ? (
-              <p className="py-10 text-center text-slate-500">Loading products...</p>
+              <p className="py-10 text-center text-slate-500">
+                Loading products...
+              </p>
             ) : visibleProducts.length === 0 ? (
               <div className="py-12 text-center">
-                <Package className="mx-auto mb-3 text-slate-400" size={36} />
+                <Package
+                  className="mx-auto mb-3 text-slate-400"
+                  size={36}
+                />
                 <p className="font-semibold">No products found</p>
-                <p className="mt-1 text-sm text-slate-500">Add a product or try another search.</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Add a product or try another search.
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -444,9 +619,14 @@ export default function AdminProductsPage() {
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-3xl">
                         {product.emoji || "🛒"}
                       </div>
+
                       <div className="min-w-0">
-                        <h3 className="truncate font-bold">{product.name}</h3>
-                        <p className="text-sm text-slate-500">{product.category}</p>
+                        <h3 className="truncate font-bold">
+                          {product.name}
+                        </h3>
+                        <p className="text-sm text-slate-500">
+                          {product.category}
+                        </p>
                         <p className="mt-1 text-sm font-bold text-emerald-800">
                           ₹{Number(product.price).toFixed(2)}
                           <span className="ml-3 font-normal text-slate-500">
@@ -463,15 +643,18 @@ export default function AdminProductsPage() {
                         aria-label={`Edit ${product.name}`}
                         className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50"
                       >
-                        <Pencil size={15} /> Edit
+                        <Pencil size={15} />
+                        Edit
                       </button>
+
                       <button
                         type="button"
                         onClick={() => void deactivateProduct(product)}
                         aria-label={`Deactivate ${product.name}`}
                         className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 size={15} /> Deactivate
+                        <Trash2 size={15} />
+                        Deactivate
                       </button>
                     </div>
                   </article>
@@ -481,7 +664,7 @@ export default function AdminProductsPage() {
           </section>
         </div>
 
-        <footer className="mt-8 text-center text-xs text-slate-500">
+        <footer className="mt-8 pb-4 text-center text-xs text-slate-500">
           FreshCart Admin · Product changes are saved to your store database.
         </footer>
       </div>

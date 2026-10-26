@@ -33,7 +33,10 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    for host in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1",
+    ).split(",")
     if host.strip()
 ]
 
@@ -122,7 +125,6 @@ DATABASES = {
 # --------------------------------------------------
 # PASSWORD VALIDATION
 # --------------------------------------------------
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": (
@@ -165,10 +167,20 @@ USE_TZ = True
 
 
 # --------------------------------------------------
-# STATIC FILES
+# STATIC AND MEDIA FILES
 # --------------------------------------------------
 
-STATIC_URL = "static/"
+# Static files: CSS, JavaScript, and admin assets
+STATIC_URL = "/static/"
+
+# Uploaded product images
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+
+# --------------------------------------------------
+# DEFAULT PRIMARY KEY
+# --------------------------------------------------
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -204,7 +216,6 @@ REST_FRAMEWORK = {
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
-# Keep these aligned with the authentication implementation
-# in store/authentication.py and store/auth_views.py.
+# Keep these aligned with your authentication implementation
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False
